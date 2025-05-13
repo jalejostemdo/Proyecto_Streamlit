@@ -29,7 +29,7 @@ date_columns = [
 ]
 # Cambiar el tipo de datos de las columnas de fecha a datetime
 df_orders[date_columns] = df_orders[date_columns].apply(pd.to_datetime)
-# Cambiar el tipo de datos de las columnas a striing
+# Cambiar el tipo de datos de las columnas a string
 df_orders[string_columns_orders] = df_orders[string_columns_orders].astype(str)
 df_customers[string_columns_customers] = df_customers[string_columns_customers].astype(str)
 
