@@ -59,7 +59,7 @@ ax.tick_params(axis='x', rotation=45)
 st.pyplot(fig)
 
 st.subheader("Resumen de Clientes por Ciudad y Estado")
-
+st.dataframe(city_summary_f1)
 
 city_summary_f2 = pd.merge(city_summary_f1, pedidos_por_ciudad, on=['customer_state', 'customer_city'])
 
@@ -93,8 +93,6 @@ ax.set_xlabel("Ciudad (Estado)")
 ax.set_ylabel("Ratio de Pedidos por Cliente")
 ax.tick_params(axis='x', rotation=45)
 st.pyplot(fig)
-
-st.dataframe(city_summary)
 
 #-------------EJERCICIO PRINCIPAL 4----------------------
 reviews_df= pd.read_csv('Olist_Data/olist_order_reviews_dataset.csv')
