@@ -79,7 +79,7 @@ df['score_medio']=df['score_medio'].round(2)
 
 # Crear figura para num reviews
 fig, ax = plt.subplots()
-ax.plot(df['num_reviews'] ,df['customer_state'])
+ax.plot(df['customer_state'],df['num_reviews'])
 ax.set_title('Num reviews por estado')
 ax.set_xlabel('Estados')
 ax.set_ylabel('Número reviews')
@@ -88,7 +88,7 @@ st.pyplot(fig)
 
 # Crear figura para num reviews
 fig, ax = plt.subplots()
-ax.plot(df['score_medio'] ,df['customer_state'])
+ax.plot(df['customer_state'],df['score_medio'])
 ax.set_title('Score medio por estado')
 ax.set_xlabel('Estados')
 ax.set_ylabel('Score medio')
