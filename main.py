@@ -45,7 +45,7 @@ city_summary_f1 = (
     .nunique()
     .reset_index(name='num_clientes')
 )
-=======
+
 top_5_states = top_states.head(5)
 
 # Mostrar gráfico en Streamlit
