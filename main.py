@@ -87,10 +87,10 @@ st.pyplot(fig)
 
 # ---------------- TABLA ----------------
 st.subheader("Resumen de Clientes por Ciudad y Estado")
-city_summary = (
+city_summary_f1 = (
     filtered_df.groupby(['customer_state', 'customer_city'])['customer_id']
     .nunique()
     .reset_index(name='num_clientes')
 )
 
-st.dataframe(city_summary)
+st.dataframe(city_summary_f1)
