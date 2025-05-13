@@ -1,5 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import streamlit as st
+
+st.title("Análisis de Clientes de Olist")
 
 df_customers = pd.read_csv('Olist_Data/olist_customers_dataset.csv')
 df_orders = pd.read_csv('Olist_Data/olist_orders_dataset.csv')
@@ -33,16 +36,23 @@ top_states = (
 
 top_5_states = top_states.head(5)
 
-top_5_states.plot(kind='bar', figsize=(10, 6), color='skyblue')
-plt.title('Top 5 Estados con más Clientes')
-plt.xlabel('Estados')
-plt.ylabel('Número de Clientes')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+# Mostrar gráfico en Streamlit
+st.subheader("Top 5 Estados con más Clientes")
+fig, ax = plt.subplots(figsize=(10, 6))
+top_5_states.plot(kind='bar', color='skyblue', ax=ax)
+ax.set_title('Top 5 Estados con más Clientes')
+ax.set_xlabel('Estados')
+ax.set_ylabel('Número de Clientes')
+ax.tick_params(axis='x', rotation=45)
+st.pyplot(fig)
 
+st.subheader("Resumen de Clientes por Ciudad y Estado")
 city_summary = (
     merged_df.groupby(['customer_state', 'customer_city'])['customer_id']
     .nunique()
     .reset_index(name='num_clientes')
 )
+
+st.dataframe(city_summary)
+
+
