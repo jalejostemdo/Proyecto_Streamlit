@@ -7,6 +7,19 @@ st.title("Análisis de Clientes de Olist")
 df_customers = pd.read_csv('Olist_Data/olist_customers_dataset.csv')
 df_orders = pd.read_csv('Olist_Data/olist_orders_dataset.csv')
 
+string_columns_orders = [
+    'customer_id'
+    'order_id',
+    'order_status',
+]
+
+string_columns_customers = [
+    'customer_id',
+    'customer_unique_id',
+    'customer_city',
+    'customer_state',
+]
+
 date_columns = [
     'order_purchase_timestamp',
     'order_approved_at',
@@ -16,6 +29,9 @@ date_columns = [
 ]
 # Cambiar el tipo de datos de las columnas de fecha a datetime
 df_orders[date_columns] = df_orders[date_columns].apply(pd.to_datetime)
+# Cambiar el tipo de datos de las columnas a striing
+df_orders[string_columns_orders] = df_orders[string_columns_orders].astype(str)
+df_customers[string_columns_customers] = df_customers[string_columns_customers].astype(str)
 
 # Si falta el valor de order_approved_at, se asume que el pedido fue aprobado en el momento 
 # de la compra
