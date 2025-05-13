@@ -118,18 +118,21 @@ df['score_medio']=df['score_medio'].round(2)
 
 # Crear figura para num reviews
 fig, ax = plt.subplots()
-ax.plot(df['customer_state'],df['num_reviews'])
+ax.bar(df['customer_state'],df['num_reviews'], color='red')
 ax.set_title('Num reviews por estado')
 ax.set_xlabel('Estados')
 ax.set_ylabel('Número reviews')
+ax.tick_params(axis='x', rotation=45)
 # Mostrar en Streamlit
 st.pyplot(fig)
 
-# Crear figura para num reviews
+# Crear figura para score medio
 fig, ax = plt.subplots()
 ax.plot(df['customer_state'],df['score_medio'])
 ax.set_title('Score medio por estado')
 ax.set_xlabel('Estados')
 ax.set_ylabel('Score medio')
+ax.tick_params(axis='x', rotation=45)
+ax.set_ylim(0, 5) #para que vaya de 0 a 5 el eje y
 # Mostrar en Streamlit
 st.pyplot(fig)
