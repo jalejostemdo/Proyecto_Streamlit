@@ -93,7 +93,7 @@ ax.set_xlabel("Ciudad (Estado)")
 ax.set_ylabel("Ratio de Pedidos por Cliente")
 ax.tick_params(axis='x', rotation=45)
 st.pyplot(fig)
-=======
+
 st.dataframe(city_summary)
 
 #-------------EJERCICIO PRINCIPAL 4----------------------
