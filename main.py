@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
+st.title("Análisis de Clientes de Olist")
+
 df_customers = pd.read_csv('Olist_Data/olist_customers_dataset.csv')
 df_orders = pd.read_csv('Olist_Data/olist_orders_dataset.csv')
 
@@ -32,11 +34,32 @@ pedidos_por_ciudad = (
     .reset_index(name='num_pedidos')
 )
 
+top_states = (
+    merged_df.groupby('customer_state')['customer_id']
+    .nunique()
+    .sort_values(ascending=False)
+)
+
 city_summary_f1 = (
-    merged_df.groupby(['customer_state', 'customer_city'])['customer_id']
+  merged_df.groupby(['customer_state', 'customer_city'])['customer_id']
     .nunique()
     .reset_index(name='num_clientes')
 )
+=======
+top_5_states = top_states.head(5)
+
+# Mostrar gráfico en Streamlit
+st.subheader("Top 5 Estados con más Clientes")
+fig, ax = plt.subplots(figsize=(10, 6))
+top_5_states.plot(kind='bar', color='skyblue', ax=ax)
+ax.set_title('Top 5 Estados con más Clientes')
+ax.set_xlabel('Estados')
+ax.set_ylabel('Número de Clientes')
+ax.tick_params(axis='x', rotation=45)
+st.pyplot(fig)
+
+st.subheader("Resumen de Clientes por Ciudad y Estado")
+
 
 city_summary_f2 = pd.merge(city_summary_f1, pedidos_por_ciudad, on=['customer_state', 'customer_city'])
 
@@ -48,7 +71,6 @@ city_summary_f2['porcentaje_pedidos'] = (
 city_summary_f2['ratio_pedidos_clientes'] = (
     city_summary_f2['num_pedidos'] / city_summary_f2['num_clientes']
 ).round(2)
-
 
 
 # Feature 2
@@ -70,4 +92,46 @@ ax.set_title("Ratio Medio de Pedidos por Cliente por Ciudad")
 ax.set_xlabel("Ciudad (Estado)")
 ax.set_ylabel("Ratio de Pedidos por Cliente")
 ax.tick_params(axis='x', rotation=45)
+st.pyplot(fig)
+=======
+st.dataframe(city_summary)
+
+#-------------EJERCICIO PRINCIPAL 4----------------------
+reviews_df= pd.read_csv('Olist_Data/olist_order_reviews_dataset.csv')
+orders_df = pd.read_csv('Olist_Data/olist_orders_dataset.csv')
+customers_df = pd.read_csv('Olist_Data/olist_customers_dataset.csv')
+
+#realizamos copias para no trbajar con el original y cojemoslas columnas que necesitamos
+orders=orders_df[['order_id','customer_id']].copy()
+customers=customers_df[['customer_id','customer_state']].copy()
+reviews=reviews_df[['review_id','order_id','review_score']].copy()
+#hacemos un primer merge para traer el campo necesario para traer en el segundo el campo necesario para agrupar por el estado
+df= pd.merge(reviews,orders,on='order_id',how='left')
+df= pd.merge(df,customers,on='customer_id',how='left')
+df=df[['review_id','review_score','customer_state']]
+#Aqui eliminamos los registros de las reviews que se han entregado tarde
+
+#agrupamos por ciudad y contamos los registros que hay en cada una y su puntuacion media
+df = df.groupby('customer_state').agg(
+    num_reviews=('review_id', 'count'),    
+    score_medio=('review_score', 'mean') 
+).reset_index()
+df['score_medio']=df['score_medio'].round(2)
+
+# Crear figura para num reviews
+fig, ax = plt.subplots()
+ax.plot(df['customer_state'],df['num_reviews'])
+ax.set_title('Num reviews por estado')
+ax.set_xlabel('Estados')
+ax.set_ylabel('Número reviews')
+# Mostrar en Streamlit
+st.pyplot(fig)
+
+# Crear figura para num reviews
+fig, ax = plt.subplots()
+ax.plot(df['customer_state'],df['score_medio'])
+ax.set_title('Score medio por estado')
+ax.set_xlabel('Estados')
+ax.set_ylabel('Score medio')
+# Mostrar en Streamlit
 st.pyplot(fig)
