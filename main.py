@@ -8,7 +8,7 @@ df_customers = pd.read_csv('Olist_Data/olist_customers_dataset.csv')
 df_orders = pd.read_csv('Olist_Data/olist_orders_dataset.csv')
 
 string_columns_orders = [
-    'customer_id'
+    'customer_id',
     'order_id',
     'order_status',
 ]
@@ -30,8 +30,9 @@ date_columns = [
 # Cambiar el tipo de datos de las columnas de fecha a datetime
 df_orders[date_columns] = df_orders[date_columns].apply(pd.to_datetime)
 # Cambiar el tipo de datos de las columnas a string
-df_orders[string_columns_orders] = df_orders[string_columns_orders].astype(str)
-df_customers[string_columns_customers] = df_customers[string_columns_customers].astype(str)
+df_orders[string_columns_orders] = df_orders[string_columns_orders].applymap(str)
+df_customers[string_columns_customers] = df_customers[string_columns_customers].applymap(str)
+
 
 # Si falta el valor de order_approved_at, se asume que el pedido fue aprobado en el momento 
 # de la compra
@@ -44,27 +45,50 @@ df_orders['order_delivered_carrier_date'].fillna(
 
 merged_df = pd.merge(df_orders, df_customers, on='customer_id', how='inner')
 
+
+# ---------------- FILTRO DE FECHAS ----------------
+st.sidebar.header("Filtrar por Fecha de Compra")
+min_date = merged_df['order_purchase_timestamp'].min()
+max_date = merged_df['order_purchase_timestamp'].max()
+
+start_date, end_date = st.sidebar.date_input(
+    "Rango de Fechas",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Asegurar que la fecha sea datetime64
+start_date = pd.to_datetime(start_date)
+end_date = pd.to_datetime(end_date)
+
+# Filtrar por fecha seleccionada
+filtered_df = merged_df[
+    (merged_df['order_purchase_timestamp'] >= start_date) &
+    (merged_df['order_purchase_timestamp'] <= end_date)
+]
+
+# ---------------- GRÁFICO ----------------
 top_states = (
-    merged_df.groupby('customer_state')['customer_id']
+    filtered_df.groupby('customer_state')['customer_id']
     .nunique()
     .sort_values(ascending=False)
 )
-
 top_5_states = top_states.head(5)
 
-# Mostrar gráfico en Streamlit
 st.subheader("Top 5 Estados con más Clientes")
 fig, ax = plt.subplots(figsize=(10, 6))
-top_5_states.plot(kind='bar', color='skyblue', ax=ax)
+top_5_states.plot(kind='bar', color='darkgreen', ax=ax)
 ax.set_title('Top 5 Estados con más Clientes')
 ax.set_xlabel('Estados')
 ax.set_ylabel('Número de Clientes')
 ax.tick_params(axis='x', rotation=45)
 st.pyplot(fig)
 
+# ---------------- TABLA ----------------
 st.subheader("Resumen de Clientes por Ciudad y Estado")
 city_summary = (
-    merged_df.groupby(['customer_state', 'customer_city'])['customer_id']
+    filtered_df.groupby(['customer_state', 'customer_city'])['customer_id']
     .nunique()
     .reset_index(name='num_clientes')
 )
