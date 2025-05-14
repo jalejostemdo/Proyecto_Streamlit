@@ -172,18 +172,86 @@ with st.expander("4.2 Análisis de Pedidos y Comportamiento del Cliente", expand
     st.subheader("Objetivo")
     st.markdown("Entender la relación entre cantidad de pedidos, porcentaje respecto al total y hábitos de consumo por cliente.")
 
-    st.subheader("KPIs")
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric("Total pedidos por ciudad", "...")
-    kpi_col2.metric("% del total nacional", "...")
-    kpi_col3.metric("Ratio pedidos por cliente", "...")
+    # Agrupaciones y métricas
+    grouped = filtered_df.groupby(['customer_state', 'customer_city'])
+
+    city_summary = grouped.agg(
+        num_clientes=('customer_unique_id', 'nunique'),
+        num_pedidos=('order_id', 'nunique')
+    ).reset_index()
+
+    total_pedidos = filtered_df['order_id'].nunique()
+    city_summary['porcentaje_pedidos'] = (
+        city_summary['num_pedidos'] / total_pedidos * 100
+    ).round(2)
+    city_summary['ratio_pedidos_cliente'] = (
+        city_summary['num_pedidos'] / city_summary['num_clientes']
+    ).round(2)
+
+    filtered_df['tiempo_entrega'] = (
+        filtered_df['order_delivered_customer_date'] - filtered_df['order_purchase_timestamp']
+    ).dt.days
+
+    entrega_por_ciudad = (
+        filtered_df.groupby(['customer_state', 'customer_city'])['tiempo_entrega']
+        .mean()
+        .reset_index(name='entrega_prom_dias')
+    )
+
+    city_summary = pd.merge(city_summary, entrega_por_ciudad, on=['customer_state', 'customer_city'], how='left')
+
+    # KPIs
+    total_pedidos_ciudades = city_summary['num_pedidos'].sum()
+    kpi_col1, kpi_col2 = st.columns(2)
+    kpi_col1.metric("Total pedidos", f"{total_pedidos_ciudades}")
+    kpi_col2.metric("Ratio pedidos por cliente (prom)", f"{city_summary['ratio_pedidos_cliente'].mean():.2f}")
 
     st.subheader("Visualizaciones")
-    st.markdown("- Barras apiladas por ciudad")
-    st.markdown("- Tabla con métricas clave")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### Top 10 Ciudades con Más Pedidos")
+        top_pedidos = city_summary.sort_values('num_pedidos', ascending=False).head(10)
+        top_pedidos['label'] = top_pedidos['customer_city'] + ' (' + top_pedidos['customer_state'] + ')'
+        fig1, ax1 = plt.subplots(figsize=(8, 5))
+        ax1.bar(top_pedidos['label'], top_pedidos['num_pedidos'], color='dodgerblue')
+        ax1.set_title("Top 10 Ciudades con Más Pedidos")
+        ax1.set_xlabel("Ciudad (Estado)")
+        ax1.set_ylabel("Número de Pedidos")
+        ax1.tick_params(axis='x', rotation=45)
+        st.pyplot(fig1)
+
+        st.markdown("#### Top 10 Ciudades con Entrega más Rápida")
+        top_fast = city_summary.sort_values('entrega_prom_dias').head(10)
+        top_fast['label'] = top_fast['customer_city'] + ' (' + top_fast['customer_state'] + ')'
+        fig2, ax2 = plt.subplots(figsize=(8, 5))
+        ax2.bar(top_fast['label'], top_fast['entrega_prom_dias'], color='seagreen')
+        ax2.set_title("Duración Promedio de Entrega por Ciudad")
+        ax2.set_xlabel("Ciudad (Estado)")
+        ax2.set_ylabel("Días Promedio de Entrega")
+        ax2.tick_params(axis='x', rotation=45)
+        st.pyplot(fig2)
+
+    with col2:
+        st.markdown("#### Top 10 Ciudades con Mayor Ratio de Pedidos por Cliente")
+        top_ratios = city_summary.sort_values('ratio_pedidos_cliente', ascending=False).head(10)
+        top_ratios['label'] = top_ratios['customer_city'] + ' (' + top_ratios['customer_state'] + ')'
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(top_ratios['label'], top_ratios['ratio_pedidos_cliente'], color='crimson')
+        ax.set_title("Ratio Medio de Pedidos por Cliente por Ciudad")
+        ax.set_xlabel("Ciudad (Estado)")
+        ax.set_ylabel("Ratio de Pedidos por Cliente")
+        ax.tick_params(axis='x', rotation=45)
+        st.pyplot(fig)
+
+        st.markdown("#### Tabla con Métricas Clave por Ciudad")
+        st.dataframe(city_summary)
 
     st.subheader("Insight")
     st.info("Algunas ciudades con alta cantidad de clientes presentan ratios bajos de pedidos por cliente. Esto sugiere oportunidades de fidelización o retención con campañas específicas (descuentos por recurrencia, newsletters, etc.).")
+
+
 
 st.markdown("---")
 
