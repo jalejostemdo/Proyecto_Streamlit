@@ -115,10 +115,9 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
     ]
     nuevos_clientes = primer_pedido_filtrado.groupby('year_month')['customer_unique_id'].count()
 
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric("Top 5 Estados", top_states_list)
-    kpi_col2.metric("Ciudades en esos Estados", top_cities_count)
-    kpi_col3.metric("Clientes Nuevos en Rango", int(nuevos_clientes.sum()))
+    kpi_col1, kpi_col2 = st.columns(2)
+    kpi_col1.metric("Top 5 Estados con más Clientes", top_states_list)
+    kpi_col2.metric("Clientes Nuevos", int(nuevos_clientes.sum()))
 
     st.subheader("Visualizaciones")
 
@@ -235,13 +234,12 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         top_cities = stacked_data.sort_values(by="total_orders", ascending=False).head(10)
 
         # Crear el gráfico de barras apiladas
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(8, 5))
         top_cities[["late_orders", "on_time_orders"]].plot(
             kind="bar", stacked=True, ax=ax, color=["red", "green"], alpha=0.8
         )
 
         # Añadir etiquetas y título
-        ax.set_xlabel("Ciudad", fontsize=12)
         ax.set_ylabel("Cantidad de Pedidos", fontsize=12)
         ax.set_xticklabels(top_cities.index, rotation=45, ha="right")
         ax.legend(["Pedidos Tardíos", "Pedidos a Tiempo"], fontsize=10)
