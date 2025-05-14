@@ -33,14 +33,21 @@ st.markdown("---")
 
 # Cargar datos
 orders = pd.read_csv('./Olist_Data/olist_orders_dataset.csv')
-customers = pd.read_csv('./Olist_Data/olist_customers_dataset.csv')
+costumers = pd.read_csv('./Olist_Data/olist_customers_dataset.csv')
 
 # Merge
-df = pd.merge(orders, customers, on='customer_id')
+df = pd.merge(orders, costumers, on='customer_id')
 df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
 df['order_delivered_customer_date'] = pd.to_datetime(df['order_delivered_customer_date'])
 df['order_estimated_delivery_date'] = pd.to_datetime(df['order_estimated_delivery_date'])
 df['year'] = df['order_purchase_timestamp'].dt.year
+
+df_costumer_orders = pd.merge(orders, costumers, on='customer_id')
+df_costumer_orders['order_purchase_timestamp'] = pd.to_datetime(df_costumer_orders['order_purchase_timestamp'])
+df_costumer_orders['order_approved_at'] = pd.to_datetime(df_costumer_orders['order_approved_at'])
+df_costumer_orders['order_delivered_carrier_date'] = pd.to_datetime(df_costumer_orders['order_delivered_carrier_date'])
+df_costumer_orders['order_delivered_customer_date'] = pd.to_datetime(df_costumer_orders['order_delivered_customer_date'])
+df_costumer_orders['order_estimated_delivery_date'] = pd.to_datetime(df_costumer_orders['order_estimated_delivery_date'])
 
 # ==== SIDEBAR ====
 st.sidebar.title("🎛️ Filtros")
@@ -231,29 +238,42 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         )
 
         # Seleccionar las ciudades con mayor cantidad de pedidos totales
-        top_cities = stacked_data.sort_values(by="total_orders", ascending=False).head(10)
+        top_cities = stacked_data.sort_values(by="total_orders", ascending=False).head(10).reset_index()
 
-        # Crear el gráfico de barras apiladas
-        fig, ax = plt.subplots(figsize=(8, 5))
-        top_cities[["late_orders", "on_time_orders"]].plot(
-            kind="bar", stacked=True, ax=ax, color=["red", "green"], alpha=0.8
+        # Crear el gráfico con Seaborn
+        fig, ax = plt.subplots(figsize=(10, 6))
+        top_cities_melted = top_cities.melt(
+            id_vars="customer_city",
+            value_vars=["late_orders", "on_time_orders"],
+            var_name="Tipo de Pedido",
+            value_name="Cantidad"
+        )
+
+        sns.barplot(
+            data=top_cities_melted,
+            x="Cantidad",
+            y="customer_city",
+            hue="Tipo de Pedido",
+            palette={"late_orders": "red", "on_time_orders": "green"},
+            ax=ax
         )
 
         # Añadir etiquetas y título
-        ax.set_ylabel("Cantidad de Pedidos", fontsize=12)
-        ax.set_xticklabels(top_cities.index, rotation=45, ha="right")
-        ax.legend(["Pedidos Tardíos", "Pedidos a Tiempo"], fontsize=10)
+        ax.set_title("Comparación de Pedidos Tardíos vs Totales por Ciudad", fontsize=14)
+        ax.set_xlabel("Cantidad de Pedidos", fontsize=12)
+        ax.set_ylabel("Ciudad", fontsize=12)
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, ["Pedidos Tardíos", "Pedidos a Tiempo"], title="Tipo de Pedido", fontsize=10)
 
-        # Añadir porcentaje de pedidos tardíos como texto encima de las barras, color rojo
-        for i, (city, row) in enumerate(top_cities.iterrows()):
+        # Añadir porcentaje de pedidos tardíos como texto al lado de las barras
+        for i, row in top_cities.iterrows():
             ax.text(
-                i,
-                row["late_orders"] + row["on_time_orders"],
-                f"{row['late_percentage']:.1f}%",
-                ha="center",
-                va="bottom",
-                fontsize=10,
-                color="red",
+            row["total_orders"] + 5,  # Ajustar posición del texto
+            i,
+            f"{row['late_percentage']:.1f}%",
+            va="center",
+            fontsize=10,
+            color="red"
             )
 
         st.pyplot(fig)
@@ -262,7 +282,7 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
     col3, col4 = st.columns([1.4, 1.4])
 
     with col3:
-        st.caption("📅 Tardíos por Mes")
+        st.caption("Evolución de Pedidos Tardíos a lo Largo del Tiempo")
         late_over_time = (
             late_df.groupby(late_df["order_purchase_timestamp"].dt.to_period("M"))
             .size()
@@ -275,16 +295,36 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         st.pyplot(fig4)
 
     with col4:
-        st.caption("📍 % Tardíos por Estado (> {:.1f}%)".format(pie_threshold))
-        late_by_state = late_df.groupby("customer_state").size().rename("late_orders").to_frame()
-        late_by_state["late_percentage"] = (late_by_state["late_orders"] / late_by_state["late_orders"].sum()) * 100
-        filtered = late_by_state[late_by_state["late_percentage"] > pie_threshold]
-        fig5, ax5 = plt.subplots(figsize=(9, 5))
-        filtered["late_percentage"].plot(
-            kind="pie", autopct="%1.1f%%", startangle=90, colormap=selected_color_theme, ax=ax5
+        # Agrupar los datos por estado y calcular la cantidad de pedidos tardíos
+        late_orders_by_state = (
+            df_costumer_orders[
+                df_costumer_orders["order_delivered_customer_date"]
+                > df_costumer_orders["order_estimated_delivery_date"]
+            ]
+            .groupby("customer_state")
+            .size()
+            .rename("late_orders")
+            .to_frame()
         )
-        ax5.set_ylabel("")
-        st.pyplot(fig5)
+
+        late_orders_by_state["late_percentage"] = (
+            late_orders_by_state["late_orders"] / late_orders_by_state["late_orders"].sum()
+        ) * 100
+        # Filtrar los estados con porcentaje mayor al 2%
+        filtered_late_orders_by_state = late_orders_by_state[late_orders_by_state["late_percentage"] > pie_threshold]
+
+        # Crear gráfico de pastel con Plotly
+        fig_pie = px.pie(
+            filtered_late_orders_by_state,
+            names=filtered_late_orders_by_state.index,
+            values="late_percentage",
+            title="Distribución de Pedidos Tardíos por Estado",
+            color=filtered_late_orders_by_state.index,
+            color_discrete_sequence=px.colors.sequential.Plasma  # Puedes cambiar el color según tus preferencias
+        )
+
+        # Mostrar el gráfico de pastel en Streamlit
+        st.plotly_chart(fig_pie, use_container_width=True)
 
     # ============================
     # Mapa Choropleth Brasil
