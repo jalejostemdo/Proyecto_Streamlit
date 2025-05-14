@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
 import requests
+import seaborn as sns
 
 st.set_page_config(page_title="Informe Olist", layout="wide")
 
@@ -43,10 +44,26 @@ df['year'] = df['order_purchase_timestamp'].dt.year
 
 # ==== SIDEBAR ====
 st.sidebar.title("🎛️ Filtros")
-years = sorted(df['year'].dropna().unique(), reverse=True)
-selected_year = st.sidebar.selectbox("Selecciona un año", years, index=0)
 
-df = df[df['year'] == selected_year]
+min_date = df['order_purchase_timestamp'].min()
+max_date = df['order_purchase_timestamp'].max()
+
+start_date, end_date = st.sidebar.date_input(
+    "Rango de Fechas",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Asegurar que la fecha sea datetime64
+start_date = pd.to_datetime(start_date)
+end_date = pd.to_datetime(end_date)
+
+# Filtrar por fecha seleccionada
+filtered_df = df[
+    (df['order_purchase_timestamp'] >= start_date) &
+    (df['order_purchase_timestamp'] <= end_date)
+]
 
 pie_threshold = st.sidebar.slider("Umbral % para gráfico circular", 0.0, 10.0, 2.0)
 color_theme_list = ['Blues', 'Greens', 'Reds', 'Purples', 'viridis', 'plasma', 'inferno', 'cividis']
@@ -75,14 +92,74 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
     st.markdown("Identificar las zonas con mayor concentración de clientes para orientar acciones comerciales y logísticas.")
 
     st.subheader("KPIs")
+    top_states = (
+        filtered_df.groupby('customer_state')['customer_unique_id']
+        .nunique()
+        .sort_values(ascending=False)
+    )
+    top_5_states = top_states.head(5)
+    top_states_list = ', '.join(top_5_states.index)
+
+    top_cities_count = (
+        filtered_df[filtered_df['customer_state'].isin(top_5_states.index)]
+        .groupby(['customer_state', 'customer_city'])['customer_unique_id']
+        .nunique()
+        .count()
+    )
+
+    primer_pedido = df.groupby('customer_unique_id')['order_purchase_timestamp'].min().reset_index()
+    primer_pedido['year_month'] = primer_pedido['order_purchase_timestamp'].dt.to_period('M')
+    primer_pedido_filtrado = primer_pedido[
+        (primer_pedido['order_purchase_timestamp'] >= start_date) &
+        (primer_pedido['order_purchase_timestamp'] <= end_date)
+    ]
+    nuevos_clientes = primer_pedido_filtrado.groupby('year_month')['customer_unique_id'].count()
+
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric("Top 5 Estados", "...")
-    kpi_col2.metric("Ciudades en esos Estados", "...")
-    kpi_col3.metric("Evolución de clientes", "...")
+    kpi_col1.metric("Top 5 Estados", top_states_list)
+    kpi_col2.metric("Ciudades en esos Estados", top_cities_count)
+    kpi_col3.metric("Clientes Nuevos en Rango", int(nuevos_clientes.sum()))
 
     st.subheader("Visualizaciones")
-    st.markdown("- Mapa de calor geográfico")
-    st.markdown("- Tabla dinámica: Estado → Ciudad → Nº Clientes")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("#### Top 5 Estados con más Clientes")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        top_5_states.plot(kind='bar', color='darkgreen', ax=ax)
+        ax.set_title('Top 5 Estados con más Clientes')
+        ax.set_xlabel('Estados')
+        ax.set_ylabel('Número de Clientes')
+        ax.tick_params(axis='x', rotation=45)
+        st.pyplot(fig)
+
+    with col2:
+        st.markdown("#### Clientes por Ciudad y Estado")
+        city_summary_f1 = (
+            filtered_df.groupby(['customer_state', 'customer_city'])['customer_unique_id']
+            .nunique()
+            .reset_index(name='num_clientes')
+        )
+        st.dataframe(city_summary_f1, height=250)
+
+    with col3:
+        st.markdown("#### Nuevos Clientes Captados por Mes")
+        nuevos_df = nuevos_clientes.reset_index(name='nuevos_clientes')
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(nuevos_df['year_month'].astype(str), nuevos_df['nuevos_clientes'], marker='o', color='purple')
+        ax.set_title("Evolución de Nuevos Clientes")
+        ax.set_xlabel("Mes")
+        ax.set_ylabel("Nuevos Clientes")
+        ax.tick_params(axis='x', rotation=45)
+        st.pyplot(fig)
+
+        if not nuevos_df.empty:
+            mejor_mes = nuevos_df.loc[nuevos_df['nuevos_clientes'].idxmax()]
+            st.markdown(f"""
+            ✅ **Mes con más captación:** `{mejor_mes['year_month']}`  
+            👥 **Nuevos clientes:** `{mejor_mes['nuevos_clientes']}`
+            """)
 
     st.subheader("Insight")
     st.info("El 67% de la base de clientes se concentra en cinco estados, siendo São Paulo el de mayor peso. Este patrón sugiere que campañas de marketing y mejoras logísticas en estos estados tendrán un mayor retorno.")
