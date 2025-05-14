@@ -404,7 +404,7 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         st.pyplot(fig)
 
     # Línea de tiempo
-    col3, col4 = st.columns([1.4, 1.4])
+    col3, col4 = st.columns([1.2, 1.8])
 
     with col3:
         st.caption("Evolución de Pedidos Tardíos a lo Largo del Tiempo")
