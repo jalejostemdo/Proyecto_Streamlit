@@ -70,7 +70,7 @@ filtered_df = merged_df[
 
 # ---------------- GRÁFICO ----------------
 top_states = (
-    filtered_df.groupby('customer_state')['customer_id']
+    filtered_df.groupby('customer_state')['customer_unique_id']
     .nunique()
     .sort_values(ascending=False)
 )
@@ -88,7 +88,7 @@ st.pyplot(fig)
 # ---------------- TABLA ----------------
 st.subheader("Resumen de Clientes por Ciudad y Estado")
 city_summary_f1 = (
-    filtered_df.groupby(['customer_state', 'customer_city'])['customer_id']
+    filtered_df.groupby(['customer_state', 'customer_city'])['customer_unique_id']
     .nunique()
     .reset_index(name='num_clientes')
 )
