@@ -175,19 +175,42 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
         st.plotly_chart(fig_map, use_container_width=True)
 
     with col2:
-        st.markdown("#### Clientes por Ciudad y Estado")
+        # Selector para estado (opcional o se sincroniza con clic en mapa si fuera posible)
+        selected_state = st.selectbox(
+            "Selecciona un estado para ver el detalle",
+            options=top_states_df['customer_state'].unique(),
+            index=0
+        )
+        st.markdown(f"#### Clientes en Ciudades de {selected_state}")
         city_summary_f1 = (
-            filtered_df.groupby(['customer_state', 'customer_city'])['customer_unique_id']
+            filtered_df[filtered_df["customer_state"] == selected_state]
+            .groupby('customer_city')['customer_unique_id']
             .nunique()
             .reset_index(name='num_clientes')
+            .sort_values(by='num_clientes', ascending=False)
         )
         st.dataframe(city_summary_f1, height=250)
 
         st.markdown("#### Nuevos Clientes Captados por Mes")
-        nuevos_df = nuevos_clientes.reset_index(name='nuevos_clientes')
+
+        # Filtrar nuevos clientes por estado seleccionado
+        clientes_en_estado = df[df['customer_state'] == selected_state]
+        primer_pedido_estado = (
+            clientes_en_estado.groupby('customer_unique_id')['order_purchase_timestamp']
+            .min()
+            .reset_index()
+        )
+        primer_pedido_estado['year_month'] = primer_pedido_estado['order_purchase_timestamp'].dt.to_period('M')
+        primer_pedido_estado_filtrado = primer_pedido_estado[
+            (primer_pedido_estado['order_purchase_timestamp'] >= start_date) &
+            (primer_pedido_estado['order_purchase_timestamp'] <= end_date)
+        ]
+        nuevos_clientes_estado = primer_pedido_estado_filtrado.groupby('year_month')['customer_unique_id'].count()
+        nuevos_df = nuevos_clientes_estado.reset_index(name='nuevos_clientes')
+
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.plot(nuevos_df['year_month'].astype(str), nuevos_df['nuevos_clientes'], marker='o', color='purple')
-        ax.set_title("Evolución de Nuevos Clientes")
+        ax.set_title(f"Nuevos Clientes en {selected_state}")
         ax.set_xlabel("Mes")
         ax.set_ylabel("Nuevos Clientes")
         ax.tick_params(axis='x', rotation=45)
