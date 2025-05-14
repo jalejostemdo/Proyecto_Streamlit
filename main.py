@@ -9,6 +9,20 @@ st.set_page_config(page_title="Informe Olist", layout="wide")
 
 st.title("Informe Analítico - Olist")
 
+
+st.markdown("""
+Este informe presenta un análisis detallado del comportamiento de los clientes y la gestión de pedidos en una plataforma de comercio electrónico en Brasil.  
+A través del procesamiento de datos históricos, se identifican patrones clave relacionados con la geografía de los clientes, puntualidad en las entregas y evolución de la base de usuarios.
+
+**Objetivos del análisis:**
+- Mejorar la experiencia del cliente
+- Optimizar la logística de entregas
+- Orientar decisiones comerciales basadas en datos
+
+Se incluyen visualizaciones interactivas para explorar las regiones con más clientes, los estados con mayor proporción de pedidos tardíos y la dinámica de adquisición de nuevos usuarios.  
+Este dashboard busca ser una herramienta estratégica para la toma de decisiones fundamentadas en datos.
+""")
+
 string_columns_orders = [
     'customer_id',
     'order_id',
@@ -128,17 +142,37 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
 
     st.subheader("Visualizaciones")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns([1.8, 1.2])
 
     with col1:
-        st.markdown("#### Top 5 Estados con más Clientes")
-        fig, ax = plt.subplots(figsize=(6, 4))
-        top_5_states.plot(kind='bar', color='darkgreen', ax=ax)
-        ax.set_title('Top 5 Estados con más Clientes')
-        ax.set_xlabel('Estados')
-        ax.set_ylabel('Número de Clientes')
-        ax.tick_params(axis='x', rotation=45)
-        st.pyplot(fig)
+        # Crear DataFrame para el mapa
+        top_states_df = top_states.reset_index()
+        top_states_df.columns = ['customer_state', 'num_customers']
+
+        # Cargar GeoJSON con estados brasileños y sus siglas
+        geojson_url = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
+        geojson_data = requests.get(geojson_url).json()
+
+        # Mapa Choropleth
+        fig_map = px.choropleth(
+            top_states_df,
+            geojson=geojson_data,
+            locations="customer_state",
+            color="num_customers",
+            color_continuous_scale="Blues",
+            featureidkey="properties.sigla",  # campo con las siglas
+            scope="south america",
+            labels={"num_customers": "Clientes"}
+        )
+
+        fig_map.update_geos(fitbounds="locations", visible=False)
+        fig_map.update_layout(
+            title="Concentración de Clientes por Estado (Brasil)",
+            margin=dict(l=0, r=0, t=30, b=0),
+            height=900
+        )
+
+        st.plotly_chart(fig_map, use_container_width=True)
 
     with col2:
         st.markdown("#### Clientes por Ciudad y Estado")
@@ -149,7 +183,6 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
         )
         st.dataframe(city_summary_f1, height=250)
 
-    with col3:
         st.markdown("#### Nuevos Clientes Captados por Mes")
         nuevos_df = nuevos_clientes.reset_index(name='nuevos_clientes')
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -166,6 +199,7 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
             ✅ **Mes con más captación:** `{mejor_mes['year_month']}`  
             👥 **Nuevos clientes:** `{mejor_mes['nuevos_clientes']}`
             """)
+        
 
     st.subheader("Insight")
     st.info("El 67% de la base de clientes se concentra en cinco estados, siendo São Paulo el de mayor peso. Este patrón sugiere que campañas de marketing y mejoras logísticas en estos estados tendrán un mayor retorno.")
@@ -394,41 +428,7 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         # Mostrar el gráfico de pastel en Streamlit
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # ============================
-    # Mapa Choropleth Brasil
-    # ============================
-    st.caption("🗺️ Mapa de Pedidos Tardíos por Estado (Choropleth)")
-
-    # Cargar GeoJSON
-    geojson_url = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
-    geojson_data = requests.get(geojson_url).json()
-
-    # Choropleth con Plotly
-    fig_map = px.choropleth(
-        late_by_state.reset_index(),
-        geojson=geojson_data,
-        locations="customer_state",
-        color="late_percentage",
-        color_continuous_scale=selected_color_theme,
-        featureidkey="properties.sigla",
-        scope="south america",
-        labels={"late_percentage": "% Tardíos"}
-    )
-
-    fig_map.update_geos(fitbounds="locations", visible=False)
-    fig_map.update_layout(
-        template="plotly_dark",
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=450,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-
-    st.plotly_chart(fig_map, use_container_width=True)
-
-    st.subheader("Insight")
-    st.info("Alrededor del 12% de los pedidos llegan tarde. La mayoría son atribuibles a vendedores con demoras reiteradas en el despacho. Recomendamos revisar SLAs y procesos logísticos con estos vendedores.")
-
+    
 st.markdown("---")
 
 
