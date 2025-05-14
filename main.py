@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import streamlit as st
 
 st.title("Análisis de Clientes de Olist")
@@ -64,7 +65,6 @@ filtered_df = merged_df[
 
 # ---------------- ANÁLISIS Y MÉTRICAS ----------------
 
-# Agrupar por ciudad y estado
 grouped = filtered_df.groupby(['customer_state', 'customer_city'])
 
 city_summary = grouped.agg(
@@ -72,7 +72,6 @@ city_summary = grouped.agg(
     num_pedidos=('order_id', 'nunique')
 ).reset_index()
 
-# Calcular métricas adicionales
 total_pedidos = filtered_df['order_id'].nunique()
 city_summary['porcentaje_pedidos'] = (
     city_summary['num_pedidos'] / total_pedidos * 100
@@ -83,25 +82,36 @@ city_summary['ratio_pedidos_cliente'] = (
 
 # ---------------- DURACIÓN DE ENTREGA ----------------
 
-# Calcular duración de entrega en días
 filtered_df['tiempo_entrega'] = (
     filtered_df['order_delivered_customer_date'] - filtered_df['order_purchase_timestamp']
 ).dt.days
 
-# Agrupar duración media por ciudad
 entrega_por_ciudad = (
     filtered_df.groupby(['customer_state', 'customer_city'])['tiempo_entrega']
     .mean()
     .reset_index(name='entrega_prom_dias')
 )
 
-# Unir con city_summary
 city_summary = pd.merge(city_summary, entrega_por_ciudad, on=['customer_state', 'customer_city'], how='left')
 
 # ---------------- TABLA FINAL ----------------
 
 st.subheader("Resumen de Clientes, Pedidos y Tiempos de Entrega por Ciudad")
 st.dataframe(city_summary)
+
+# ---------------- GRÁFICO: TOP 10 CIUDADES POR PEDIDOS ----------------
+
+st.subheader("Top 10 Ciudades con Mayor Número de Pedidos")
+top_pedidos = city_summary.sort_values('num_pedidos', ascending=False).head(10)
+top_pedidos['label'] = top_pedidos['customer_city'] + ' (' + top_pedidos['customer_state'] + ')'
+
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.bar(top_pedidos['label'], top_pedidos['num_pedidos'], color='dodgerblue')
+ax.set_title("Top 10 Ciudades con Más Pedidos")
+ax.set_xlabel("Ciudad (Estado)")
+ax.set_ylabel("Número de Pedidos")
+ax.tick_params(axis='x', rotation=45)
+st.pyplot(fig)
 
 # ---------------- GRÁFICO: RATIO PEDIDOS / CLIENTE ----------------
 
