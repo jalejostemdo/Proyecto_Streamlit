@@ -127,39 +127,66 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
     st.subheader("Visualizaciones")
 
     # Gráficos compactos
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns([1.2, 1.8])
 
     with col1:
-        st.caption("🏙️ Top 5 Ciudades con más Pedidos Tardíos")
-        fig1, ax1 = plt.subplots(figsize=(7, 5))
-        top_late = late_orders.sort_values("late_orders", ascending=False).head(5)
-        top_late["late_orders"].plot(kind="bar", color="tomato", ax=ax1)
-        ax1.set_ylabel("")
-        ax1.set_xticklabels(top_late.index, rotation=45, ha="right")
-        st.pyplot(fig1)
+        # Gráfico de Top 10 Ciudades con Pedidos Tardíos
+        st.caption("Pedidos Tardíos por ciudades")
+
+        # Ordenar las ciudades por la cantidad de pedidos tardíos de mayor a menor
+        top_late_orders = late_orders.sort_values(by="late_orders", ascending=False)
+
+        # Seleccionar las columnas que queremos mostrar
+        top_late_orders_display = top_late_orders[["late_orders", "late_percentage"]].copy()
+        top_late_orders_display["late_percentage"] = top_late_orders_display["late_percentage"].round(2)
+
+        # Mostrar la tabla scrolleable
+        st.dataframe(top_late_orders_display, height=400)  # `height=400` hace que la tabla sea scrolleable
+
+
 
     with col2:
-        st.caption("📈 % Tardíos vs Totales (Top 5 Ciudades)")
-        fig2, ax2 = plt.subplots(figsize=(7, 5))
-        top = late_orders.sort_values("total_orders", ascending=False).head(5)
-        top[["late_orders", "total_orders"]].plot(kind="bar", stacked=False, ax=ax2, color=["red", "lightgray"])
-        ax2.set_ylabel("")
-        ax2.set_xticklabels(top.index, rotation=45, ha="right")
-        st.pyplot(fig2)
+        st.caption("📊 Comparación de Pedidos Tardíos vs Totales por Ciudad")
 
-    with col3:
-        st.caption("⏳ Prom. Días de Retraso (Top 5 Ciudades)")
-        fig3, ax3 = plt.subplots(figsize=(7, 5))
-        late_orders.sort_values("avg_late_days", ascending=False).head(5)["avg_late_days"].plot(
-            kind="barh", color="orange", ax=ax3
+        # Crear un DataFrame con los datos necesarios
+        stacked_data = late_orders[["late_orders", "total_orders", "late_percentage", "avg_late_days"]].copy()
+        stacked_data["on_time_orders"] = (
+            stacked_data["total_orders"] - stacked_data["late_orders"]
         )
-        ax3.set_xlabel("")
-        st.pyplot(fig3)
+
+        # Seleccionar las ciudades con mayor cantidad de pedidos totales
+        top_cities = stacked_data.sort_values(by="total_orders", ascending=False).head(10)
+
+        # Crear el gráfico de barras apiladas
+        fig, ax = plt.subplots(figsize=(10, 4))
+        top_cities[["late_orders", "on_time_orders"]].plot(
+            kind="bar", stacked=True, ax=ax, color=["red", "green"], alpha=0.8
+        )
+
+        # Añadir etiquetas y título
+        ax.set_xlabel("Ciudad", fontsize=12)
+        ax.set_ylabel("Cantidad de Pedidos", fontsize=12)
+        ax.set_xticklabels(top_cities.index, rotation=45, ha="right")
+        ax.legend(["Pedidos Tardíos", "Pedidos a Tiempo"], fontsize=10)
+
+        # Añadir porcentaje de pedidos tardíos como texto encima de las barras, color rojo
+        for i, (city, row) in enumerate(top_cities.iterrows()):
+            ax.text(
+                i,
+                row["late_orders"] + row["on_time_orders"],
+                f"{row['late_percentage']:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=10,
+                color="red",
+            )
+
+        st.pyplot(fig)
 
     # Línea de tiempo
-    col4, col5 = st.columns([1.4, 1.4])
+    col3, col4 = st.columns([1.4, 1.4])
 
-    with col4:
+    with col3:
         st.caption("📅 Tardíos por Mes")
         late_over_time = (
             late_df.groupby(late_df["order_purchase_timestamp"].dt.to_period("M"))
@@ -172,7 +199,7 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
         late_over_time.plot(ax=ax4, marker="o", legend=False)
         st.pyplot(fig4)
 
-    with col5:
+    with col4:
         st.caption("📍 % Tardíos por Estado (> {:.1f}%)".format(pie_threshold))
         late_by_state = late_df.groupby("customer_state").size().rename("late_orders").to_frame()
         late_by_state["late_percentage"] = (late_by_state["late_orders"] / late_by_state["late_orders"].sum()) * 100
