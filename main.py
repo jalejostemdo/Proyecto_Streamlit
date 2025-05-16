@@ -27,15 +27,7 @@ A partir del procesamiento de datos históricos, se han extraído patrones relev
 - Facilitar la toma de decisiones comerciales basadas en datos objetivos.
 
 ---
-
-### Contenido del dashboard
-
-- **Distribución geográfica**: análisis por estado y ciudad de la base de clientes.
-- **Nuevos clientes**: evolución temporal de la captación de usuarios.
-- **Retrasos logísticos**: evaluación de la puntualidad en entregas y factores asociados.
-- **Validación de hipótesis**: exploración de variables que podrían influir en los retrasos.
-
-Este informe busca ofrecer una base sólida para la toma de decisiones estratégicas en áreas como logística, marketing, atención al cliente y desarrollo comercial.
+            
 """)
 
 st.subheader("Datos Utilizados")
@@ -746,7 +738,8 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
     En promedio, los pedidos entregados a tiempo fueron despachados 2.2 horas antes que los que se entregaron con retraso.
    """)
         
-    st.markdown("---")
+        
+st.markdown("---")
 
 
 # ============================
