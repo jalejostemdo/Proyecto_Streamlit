@@ -9,19 +9,51 @@ st.set_page_config(page_title="Informe Olist", layout="wide")
 
 st.title("Informe Analítico - Olist")
 
+st.markdown("""
+Este informe interactivo presenta un análisis integral del comportamiento de los clientes y la operativa de pedidos en la plataforma de comercio electrónico **Olist**, con foco en el mercado brasileño.
+
+A partir del procesamiento de datos históricos, se han extraído patrones relevantes que permiten:
+
+- Identificar regiones con mayor concentración de clientes.
+- Detectar y entender causas de retrasos en las entregas.
+- Analizar la evolución en la adquisición de nuevos usuarios.
+
+---
+
+### Objetivos del análisis
+
+- Mejorar la experiencia del cliente mediante una comprensión más profunda de su comportamiento.
+- Optimizar la logística a partir del diagnóstico de puntos críticos en la cadena de entrega.
+- Facilitar la toma de decisiones comerciales basadas en datos objetivos.
+
+---
+
+### Contenido del dashboard
+
+- **Distribución geográfica**: análisis por estado y ciudad de la base de clientes.
+- **Nuevos clientes**: evolución temporal de la captación de usuarios.
+- **Retrasos logísticos**: evaluación de la puntualidad en entregas y factores asociados.
+- **Validación de hipótesis**: exploración de variables que podrían influir en los retrasos.
+
+Este informe busca ofrecer una base sólida para la toma de decisiones estratégicas en áreas como logística, marketing, atención al cliente y desarrollo comercial.
+""")
+
+st.subheader("Datos Utilizados")
 
 st.markdown("""
-Este informe presenta un análisis detallado del comportamiento de los clientes y la gestión de pedidos en una plataforma de comercio electrónico en Brasil.  
-A través del procesamiento de datos históricos, se identifican patrones clave relacionados con la geografía de los clientes, puntualidad en las entregas y evolución de la base de usuarios.
+Los datasets utilizados reflejan diferentes aspectos del negocio, permitiendo un análisis transversal y completo:
 
-**Objetivos del análisis:**
-- Mejorar la experiencia del cliente
-- Optimizar la logística de entregas
-- Orientar decisiones comerciales basadas en datos
+- **olist_customers_dataset.csv**: Información demográfica y geográfica de los clientes.
+- **olist_orders_dataset.csv**: Datos generales de los pedidos, incluyendo fechas clave del proceso de compra.
+- **olist_order_items_dataset.csv**: Detalle de cada ítem incluido en los pedidos (productos, vendedores y plazos de entrega).
+- **olist_order_payments_dataset.csv**: Métodos de pago utilizados y número de cuotas.
+- **olist_order_reviews_dataset.csv**: Valoraciones y comentarios de los clientes tras recibir los pedidos.
+- **olist_products_dataset.csv**: Información de cada producto vendido, incluyendo la categoría.
+- **olist_sellers_dataset.csv**: Datos geográficos de los vendedores que operan en la plataforma.
 
-Se incluyen visualizaciones interactivas para explorar las regiones con más clientes, los estados con mayor proporción de pedidos tardíos y la dinámica de adquisición de nuevos usuarios.  
-Este dashboard busca ser una herramienta estratégica para la toma de decisiones fundamentadas en datos.
+Estos datos han sido procesados, combinados y filtrados para obtener indicadores clave y construir visualizaciones que faciliten la toma de decisiones estratégicas.
 """)
+
 
 string_columns_orders = [
     'customer_id',
@@ -327,10 +359,9 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
     st.markdown("Analizar causas y patrones en los pedidos que superan la fecha estimada de entrega.")
 
     st.subheader("KPIs")
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+    kpi_col1, kpi_col2 = st.columns(2)
     kpi_col1.metric("% Pedidos con retraso", f"{avg_late_percent:.1f}%")
     kpi_col2.metric("Días promedio de retraso", f"{avg_late_days:.1f}")
-    kpi_col3.metric("Causa principal", "Demora del vendedor en despachar (43%)")
 
     st.subheader("Visualizaciones")
 
@@ -450,9 +481,176 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
 
         # Mostrar el gráfico de pastel en Streamlit
         st.plotly_chart(fig_pie, use_container_width=True)
-
     
-st.markdown("---")
+
+
+    st.subheader("Análisis de Causas Potenciales")
+
+    st.markdown("Exploramos distintas hipótesis para entender las causas más frecuentes detrás de los pedidos entregados con retraso.")
+
+    tabs = st.tabs(["Tiempo de Despacho", "Categoría del Producto", "Vendedores", "Tipo de Pago"])
+
+    # TAB 1 - Tiempo de despacho
+    df_costumer_orders["dispatch_time"] = (
+        df_costumer_orders["order_approved_at"] - df_costumer_orders["order_purchase_timestamp"]
+    ).dt.total_seconds() / 3600  # Convertir a horas
+
+    # Separar los pedidos en entregados a tiempo y entregados tarde
+    on_time_orders = df_costumer_orders[
+        df_costumer_orders["order_delivered_customer_date"]
+        <= df_costumer_orders["order_estimated_delivery_date"]
+    ]
+    late_orders = df_costumer_orders[
+        df_costumer_orders["order_delivered_customer_date"]
+        > df_costumer_orders["order_estimated_delivery_date"]
+    ]
+
+    # Calcular el tiempo promedio de despacho para cada grupo
+    avg_dispatch_time_on_time = on_time_orders["dispatch_time"].mean()
+    avg_dispatch_time_late = late_orders["dispatch_time"].mean()
+    with tabs[0]:
+        st.markdown("¿Los pedidos tardíos se deben a que los vendedores tardan más en despacharlos?")
+        despacho_df = pd.DataFrame({
+        "Tipo de Pedido": ["A Tiempo", "Tardío"],
+        "Tiempo Promedio de Despacho (horas)": [10.10, 12.31]
+        })
+        fig1 = px.bar(
+        despacho_df,
+        x="Tipo de Pedido",
+        y="Tiempo Promedio de Despacho (horas)",
+        color="Tipo de Pedido",
+        color_discrete_map={"A Tiempo": "green", "Tardío": "red"},
+        text="Tiempo Promedio de Despacho (horas)"
+        )
+        fig1.update_layout(title="Comparación del Tiempo de Despacho")
+        st.plotly_chart(fig1, use_container_width=True)
+
+    # TAB 2 - Categoría del producto
+    # Cargar el dataset de items de pedido
+    order_items = pd.read_csv('./Olist_Data/olist_order_items_dataset.csv')
+
+    # Cargar el dataset de productos
+    products = pd.read_csv('./Olist_Data/olist_products_dataset.csv')
+
+    # Combinar los datos de items de pedido con los productos
+    df_items_with_products = pd.merge(
+        order_items,
+        products,
+        on='product_id',  # Relacionar por la columna 'product_id'
+        how='inner'
+    )
+
+    # Combinar los datos de items con los pedidos
+    df_orders_with_items_products = pd.merge(
+        df_costumer_orders,
+        df_items_with_products,
+        on='order_id',  # Relacionar por la columna 'order_id'
+        how='inner'
+    )
+
+    # Filtrar los pedidos tardíos
+    late_orders_with_products = df_orders_with_items_products[
+        df_orders_with_items_products["order_delivered_customer_date"]
+        > df_orders_with_items_products["order_estimated_delivery_date"]
+    ]
+
+    # Calcular el porcentaje de pedidos tardíos por categoría de producto
+    late_percentage_by_category = (
+        late_orders_with_products.groupby("product_category_name").size()
+        / df_orders_with_items_products.groupby("product_category_name").size()
+    ) * 100
+
+    # Ordenar por porcentaje de pedidos tardíos
+    late_percentage_by_category = late_percentage_by_category.sort_values(ascending=False)
+
+    with tabs[1]:
+        st.markdown("¿Algunas categorías de productos tienen más retrasos que otras?")
+        cat_df = pd.DataFrame({
+        "Categoría": [
+            "casa_conforto_2", "moveis_colchao_e_estofado", "audio",
+            "fashion_underwear_e_moda_praia", "artigos_de_natal"
+        ],
+        "Promedio Horas de Despacho": [
+            16.67, 13.16, 12.64, 12.21, 11.76
+        ]
+        })
+
+        fig2 = px.bar(
+        cat_df.sort_values("Promedio Horas de Despacho", ascending=False),
+        x="Promedio Horas de Despacho",
+        y="Categoría",
+        orientation="h",
+        color="Promedio Horas de Despacho",
+        color_continuous_scale="viridis"
+        )
+        fig2.update_layout(title="Categorías con Mayor Tiempo de Despacho en Pedidos Tardíos")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # TAB 3 - Vendedores con más retrasos
+    # Calcular el número de pedidos tardíos por vendedor
+    late_orders_by_seller = (
+        late_orders_with_products.groupby("seller_id").size().rename("late_orders").to_frame()
+    )
+
+    # Calcular el número total de pedidos por vendedor
+    total_orders_by_seller = (
+        df_orders_with_items_products.groupby("seller_id").size().rename("total_orders").to_frame()
+    )
+
+    # Combinar los datos de pedidos tardíos y totales
+    seller_analysis = late_orders_by_seller.join(total_orders_by_seller, how="inner")
+
+    # Calcular el porcentaje de pedidos tardíos por vendedor
+    seller_analysis["late_percentage"] = (seller_analysis["late_orders"] / seller_analysis["total_orders"]) * 100
+
+    # Ordenar por porcentaje de pedidos tardíos
+    seller_analysis = seller_analysis.sort_values(by="late_percentage", ascending=False)
+
+    # Mostrar los resultados
+    seller_analysis
+    with tabs[2]:
+        st.markdown("¿Existen vendedores con alta proporción de retrasos?")
+        top_sellers = seller_analysis.head(10).reset_index()
+
+        fig3 = px.bar(
+        top_sellers,
+        x="late_percentage",
+        y="seller_id",
+        orientation="h",
+        text="late_percentage",
+        labels={"late_percentage": "% Pedidos Tardíos", "seller_id": "Vendedor"},
+        color="late_percentage",
+        color_continuous_scale="Reds"
+        )
+        fig3.update_layout(title="Top 10 Vendedores con Mayor % de Pedidos Tardíos")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    # TAB 4 - Método de pago
+    with tabs[3]:
+        st.markdown("¿El método de pago influye en los retrasos? (Poca evidencia, pero se analiza)")
+        payment_df = pd.DataFrame({
+        "Método de Pago": ["boleto", "credit_card", "debit_card", "voucher"],
+        "% Pedidos Tardíos": [8.61, 7.72, 7.72, 6.44]
+        })
+        fig4 = px.bar(
+        payment_df.sort_values("% Pedidos Tardíos", ascending=False),
+        x="% Pedidos Tardíos",
+        y="Método de Pago",
+        orientation="h",
+        color="% Pedidos Tardíos",
+        color_continuous_scale="Blues"
+        )
+        fig4.update_layout(title="% Pedidos Tardíos por Método de Pago")
+        st.plotly_chart(fig4, use_container_width=True)
+
+
+    st.subheader("Insight")
+    st.info("""
+    El análisis revela que la principal causa de retrasos en las entregas está asociada a demoras en el despacho por parte de los vendedores.  
+    En promedio, los pedidos entregados a tiempo fueron despachados 2.2 horas antes que los que se entregaron con retraso.
+   """)
+        
+    st.markdown("---")
 
 
 # ============================
