@@ -46,6 +46,12 @@ Los datasets utilizados reflejan diferentes aspectos del negocio, permitiendo un
 Estos datos han sido procesados, combinados y filtrados para obtener indicadores clave y construir visualizaciones que faciliten la toma de decisiones estratégicas.
 """)
 
+st.markdown("---")
+st.markdown(
+    "Repositorio en GitHub: https://github.com/jalejostemdo/Proyecto_Streamlit",
+    unsafe_allow_html=True
+)
+
 
 string_columns_orders = [
     'customer_id',
