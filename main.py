@@ -48,7 +48,11 @@ st.markdown("---")
 # Cargar datos
 orders = pd.read_csv('./Olist_Data/olist_orders_dataset.csv')
 costumers = pd.read_csv('./Olist_Data/olist_customers_dataset.csv')
-
+reviews = pd.read_csv('Olist_Data/olist_order_reviews_dataset.csv')
+items = pd.read_csv('Olist_Data/olist_order_items_dataset.csv')
+sellers = pd.read_csv('Olist_Data/olist_sellers_dataset.csv')
+products = pd.read_csv('Olist_Data/olist_products_dataset.csv')
+name_trans = pd.read_csv('Olist_Data/product_category_name_translation.csv')
 # Merge
 df = pd.merge(orders, costumers, on='customer_id')
 df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
@@ -62,6 +66,30 @@ df_costumer_orders['order_approved_at'] = pd.to_datetime(df_costumer_orders['ord
 df_costumer_orders['order_delivered_carrier_date'] = pd.to_datetime(df_costumer_orders['order_delivered_carrier_date'])
 df_costumer_orders['order_delivered_customer_date'] = pd.to_datetime(df_costumer_orders['order_delivered_customer_date'])
 df_costumer_orders['order_estimated_delivery_date'] = pd.to_datetime(df_costumer_orders['order_estimated_delivery_date'])
+
+orders_4 = orders[['order_id', 'customer_id']].copy()
+customers_4 = costumers[['customer_id', 'customer_state']].copy()
+reviews_4 = reviews[['review_id', 'order_id', 'review_score']].copy()
+
+df_4 = pd.merge(reviews_4, orders_4, on='order_id', how='left')
+df_4 = pd.merge(df_4, customers_4, on='customer_id', how='left')
+df_costumer_orders['is_late'] = df_costumer_orders['order_delivered_customer_date'] > df_costumer_orders['order_estimated_delivery_date']
+df_4 = pd.merge(df_4, df_costumer_orders, on='order_id', how='left')
+
+reviews_5 = reviews[['order_id', 'review_score']].copy()
+items_5 = items[['order_id', 'product_id', 'seller_id', 'price', 'freight_value']].copy()
+items_5['Total prize'] = items_5['price'].astype(float) + items_5['freight_value'].astype(float)
+items_5['Total prize'] = items_5['Total prize'].round(2)
+
+products_5 = products[['product_id', 'product_category_name']].copy()
+product_category_5 = pd.merge(products_5, name_trans, on='product_category_name', how='left')
+product_category_5 = product_category_5[['product_id', 'product_category_name_english']]
+product_category_5 = product_category_5.rename(columns={'product_category_name_english': 'product_category_name'})
+
+df_5 = pd.merge(reviews_5, items_5, on='order_id', how='left')
+df_5 = pd.merge(df_5, sellers, on='seller_id', how='left')
+df_5 = pd.merge(df_5, product_category_5, on='product_id', how='left')
+df_5 = df_5.drop_duplicates()
 
 # ==== SIDEBAR ====
 st.sidebar.title("🎛️ Filtros")
@@ -90,6 +118,62 @@ pie_threshold = st.sidebar.slider("Umbral % para gráfico circular", 0.0, 10.0, 
 color_theme_list = ['Blues', 'Greens', 'Reds', 'Purples', 'viridis', 'plasma', 'inferno', 'cividis']
 selected_color_theme = st.sidebar.selectbox("Tema de color", color_theme_list)
 
+# Filtro por estado del vendedor
+estados_disponibles = df_5['seller_state'].dropna().unique()
+estados_seleccionados = st.sidebar.multiselect(
+    "Filtrar por estado del vendedor",
+    options=sorted(estados_disponibles),
+    default=sorted(estados_disponibles)
+)
+df_5 = df_5[df_5['seller_state'].isin(estados_seleccionados)]
+
+# Filtro por calificación
+score_min, score_max = st.sidebar.slider(
+    "Filtrar por calificación (review_score)",
+    int(df_5['review_score'].min()),
+    int(df_5['review_score'].max()),
+    (int(df_5['review_score'].min()), int(df_5['review_score'].max()))
+)
+df_5 = df_5[(df_5['review_score'] >= score_min) & (df_5['review_score'] <= score_max)]
+
+# Filtro por precio total
+price_min, price_max = st.sidebar.slider(
+    "Filtrar por precio total",
+    float(df_5['Total prize'].min()), float(df_5['Total prize'].max()),
+    (float(df_5['Total prize'].min()), float(df_5['Total prize'].max()))
+)
+df_5 = df_5[(df_5['Total prize'] >= price_min) & (df_5['Total prize'] <= price_max)]
+
+# Filtro por costo de envío
+freight_min, freight_max = st.sidebar.slider(
+    "Filtrar por costo de envío",
+    float(df_5['freight_value'].min()), float(df_5['freight_value'].max()),
+    (float(df_5['freight_value'].min()), float(df_5['freight_value'].max()))
+)
+df_5 = df_5[(df_5['freight_value'] >= freight_min) & (df_5['freight_value'] <= freight_max)]
+
+# Filtro por número de pedidos
+st.sidebar.subheader("Filtrar por número de pedidos")
+# Contamos el número de pedidos por vendedor (o cliente)
+order_count = df_5.groupby('seller_id')['order_id'].nunique()
+
+# Definir el rango de pedidos (mínimo y máximo)
+min_orders = int(order_count.min())
+max_orders = int(order_count.max())
+
+# Slider para seleccionar el rango de número de pedidos
+min_filter, max_filter = st.sidebar.slider(
+    "Selecciona el rango de número de pedidos",
+    min_value=min_orders,
+    max_value=max_orders,
+    value=(min_orders, max_orders),
+    step=1
+)
+
+# Filtrar el dataframe según el número de pedidos
+filtered_order_df = order_count[(order_count >= min_filter) & (order_count <= max_filter)]
+df_5 = df_5[df_5['seller_id'].isin(filtered_order_df.index)]
+
 # ==== PROCESAMIENTO ====
 late_df = df[df["order_delivered_customer_date"] > df["order_estimated_delivery_date"]]
 late_orders = late_df.groupby("customer_city").size().rename("late_orders").to_frame()
@@ -100,11 +184,23 @@ late_orders["total_orders"] = df.groupby("customer_city").size()
 late_orders["late_percentage"] = (late_orders["late_orders"] / late_orders["total_orders"]) * 100
 late_orders.dropna(inplace=True)
 
+df_4 = df_4[['review_id', 'review_score', 'customer_state_x']]
+df_4 = df_4.groupby('customer_state_x').agg(
+        num_reviews=('review_id', 'count'),
+        score_medio=('review_score', 'mean')
+    ).reset_index()
+df_4['score_medio'] = df_4['score_medio'].round(2)
+df_4.rename(columns={'customer_state_x': 'customer_state'}, inplace=True)
+df_4 = df_4.sort_values(by='num_reviews', ascending=False)
 # KPIs
 total_late = late_df.shape[0]
 avg_late_days = late_orders["avg_late_days"].mean()
 avg_late_percent = late_orders["late_percentage"].mean()
-
+num_reviews = df_4['num_reviews'].count()
+score_mean = df_4['score_medio'].mean()
+score_mean =score_mean.round(2)
+best_seller=df_5.groupby('seller_id')['review_score'].mean().sort_values(ascending=False).head(1)
+top_category= df_5['product_category_name'].value_counts().head(10)
 # ============================
 # 4.1 Distribución Geográfica
 # ============================
@@ -464,80 +560,48 @@ with st.expander("4.4 Reputación y Opinión del Cliente (excluye pedidos con re
 
     st.subheader("KPIs")
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric("Número de reviews por estado", "...")
-    kpi_col2.metric("Puntuación promedio", "...")
-    kpi_col3.metric("Score por región", "...")
+    kpi_col1.metric("Número de reviews", num_reviews)
+    kpi_col2.metric("Puntuación promedio", score_mean)
 
     st.subheader("Visualizaciones")
-    st.markdown("- Boxplot por estado")
-    st.markdown("- Mapa por score promedio")
+    # --- Gráfico 1: Número de reviews ---
+    st.caption("Número de reviews por estado")
 
+    fig1, ax1 = plt.subplots(figsize=(10, 6))
+    bars = ax1.bar(df_4['customer_state'], df_4['num_reviews'], color='cornflowerblue', edgecolor='black')
+    ax1.set_title('Número de reviews por estado', fontsize=14)
+    ax1.set_xlabel('Estado', fontsize=12)
+    ax1.set_ylabel('Número de reviews', fontsize=12)
+    ax1.tick_params(axis='x', rotation=45)
+    ax1.grid(axis='y', linestyle='--', alpha=0.5)
+    for bar in bars:
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width() / 2, height + 5, f'{height}', ha='center', va='bottom', fontsize=8)
+    st.pyplot(fig1)
+
+    # --- Gráfico 2: Score medio ---
+    st.caption("Score medio por estado")
+
+    fig2, ax2 = plt.subplots(figsize=(10, 6))
+    bars2 = ax2.bar(df_4['customer_state'], df_4['score_medio'], color='mediumseagreen', edgecolor='black')
+    ax2.set_title('Puntuación media de reviews por estado', fontsize=14)
+    ax2.set_xlabel('Estado', fontsize=12)
+    ax2.set_ylabel('Score medio', fontsize=12)
+    ax2.set_ylim(0, 5)
+    ax2.tick_params(axis='x', rotation=45)
+    ax2.grid(axis='y', linestyle='--', alpha=0.5)
+    for bar in bars2:
+        height = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width() / 2, height + 0.05, f'{height:.2f}', ha='center', va='bottom', fontsize=8)
+    st.pyplot(fig2)
+
+    # --- Tabla final ---
+    st.markdown("## Tabla de reviews y puntuación media por estado")
+    st.dataframe(df_4)
     st.subheader("Insight")
     st.info("Los estados con mejor logística tienden a tener mejores puntuaciones. Aislar el impacto del retraso permite evaluar de forma más precisa la satisfacción con el producto y servicio.")
 
-    # --- Carga de datos ---
-    reviews = pd.read_csv('Olist_Data/olist_order_reviews_dataset.csv')
-    # --- Preprocesamiento ---
-    orders_4 = orders[['order_id', 'customer_id']].copy()
-    customers_4 = costumers[['customer_id', 'customer_state']].copy()
-    reviews_4 = reviews[['review_id', 'order_id', 'review_score']].copy()
 
-    df_4 = pd.merge(reviews_4, orders_4, on='order_id', how='left')
-    df_4 = pd.merge(df_4, customers_4, on='customer_id', how='left')
-
-    # Filtrar reviews de pedidos entregados a tiempo
-    df_customer_orders_4 = pd.merge(orders, costumers, on='customer_id')
-    df_customer_orders_4 = df_customer_orders_4[['order_delivered_customer_date', 'order_estimated_delivery_date', 'order_id']]
-    df_customer_orders_4['order_delivered_customer_date'] = pd.to_datetime(df_customer_orders_4['order_delivered_customer_date'])
-    df_customer_orders_4['order_estimated_delivery_date'] = pd.to_datetime(df_customer_orders_4['order_estimated_delivery_date'])
-    df_customer_orders_4['is_late'] = df_customer_orders_4['order_delivered_customer_date'] > df_customer_orders_4['order_estimated_delivery_date']
-    df_4 = pd.merge(df_4, df_customer_orders_4, on='order_id', how='left')
-    df_4 = df_4[df_4["is_late"] == False]
-
-    # Agrupar por estado
-    df_4 = df_4[['review_id', 'review_score', 'customer_state']]
-    df_4 = df_4.groupby('customer_state').agg(
-        num_reviews=('review_id', 'count'),
-        score_medio=('review_score', 'mean')
-    ).reset_index()
-    df_4['score_medio'] = df_4['score_medio'].round(2)
-    df_4 = df_4.sort_values(by='num_reviews', ascending=False)
-
-
-    # --- Gráfico 1: Número de reviews ---
-st.markdown("## 📊 Número de reviews por estado")
-
-fig1, ax1 = plt.subplots(figsize=(10, 6))
-bars = ax1.bar(df_4['customer_state'], df_4['num_reviews'], color='cornflowerblue', edgecolor='black')
-ax1.set_title('Número de reviews por estado', fontsize=14)
-ax1.set_xlabel('Estado', fontsize=12)
-ax1.set_ylabel('Número de reviews', fontsize=12)
-ax1.tick_params(axis='x', rotation=45)
-ax1.grid(axis='y', linestyle='--', alpha=0.5)
-for bar in bars:
-    height = bar.get_height()
-    ax1.text(bar.get_x() + bar.get_width() / 2, height + 5, f'{height}', ha='center', va='bottom', fontsize=8)
-st.pyplot(fig1)
-
-# --- Gráfico 2: Score medio ---
-st.markdown("## ⭐️ Score medio por estado")
-
-fig2, ax2 = plt.subplots(figsize=(10, 6))
-bars2 = ax2.bar(df_4['customer_state'], df_4['score_medio'], color='mediumseagreen', edgecolor='black')
-ax2.set_title('Puntuación media de reviews por estado', fontsize=14)
-ax2.set_xlabel('Estado', fontsize=12)
-ax2.set_ylabel('Score medio', fontsize=12)
-ax2.set_ylim(0, 5)
-ax2.tick_params(axis='x', rotation=45)
-ax2.grid(axis='y', linestyle='--', alpha=0.5)
-for bar in bars2:
-    height = bar.get_height()
-    ax2.text(bar.get_x() + bar.get_width() / 2, height + 0.05, f'{height:.2f}', ha='center', va='bottom', fontsize=8)
-st.pyplot(fig2)
-
-# --- Tabla final ---
-st.markdown("## 🧾 Tabla de reviews y puntuación media por estado")
-st.dataframe(df_4)
 st.markdown("---")
 
 # ============================
@@ -548,176 +612,90 @@ with st.expander("4.5 Productos y Vendedores", expanded=True):
     st.markdown("Identificar qué productos y vendedores tienen mayor impacto en las ventas y en la satisfacción del cliente.")
     st.subheader("KPIs")
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric("Volumen por categoría", "...")
-    kpi_col2.metric("Ingresos asociados", "...")
-    kpi_col3.metric("Ticket promedio", "...")
+    kpi_col1.metric("Mejor vendedor", best_seller.index[0])
+    kpi_col2.metric("Categoria mas vendida", top_category.index[0])
+    # -----------------------------
+    # Gráficos
+    # -----------------------------
+    col1, col2 = st.columns(2)
 
-    st.subheader("Visualizaciones")
-    st.markdown("- Top 10 categorías por ventas")
-    st.markdown("- Heatmap de ticket promedio")
+    # 1. Vendedores mejor valorados
+    with col1:
+        st.subheader("Vendedores mejor valorados (Top 10)")
+        top_sellers_5 = df_5.groupby('seller_id')['review_score'].mean().sort_values(ascending=False).head(10)
+        top_sellers_5.index = top_sellers_5.index.str[:10] + "..."
+        fig1, ax1 = plt.subplots()
+        top_sellers_5.plot(kind='bar', ax=ax1, color='skyblue')
+        ax1.set_ylabel('Puntuación Promedio')
+        ax1.set_xlabel('')
+        ax1.set_title('')
+        st.pyplot(fig1)
+
+    # 2. Distribución de calificaciones (Donut)
+    with col2:
+        st.subheader("Distribución de Calificaciones")
+        review_counts_5 = df_5['review_score'].value_counts().sort_index()
+        colors_5 = sns.color_palette('pastel')[0:5]
+        labels_5 = [str(int(score)) for score in review_counts_5.index]
+
+        fig5, ax5 = plt.subplots()
+        wedges, texts, autotexts = ax5.pie(
+            review_counts_5,
+            labels=labels_5,
+            autopct='%1.1f%%',
+            startangle=90,
+            colors =colors_5,
+            wedgeprops=dict(width=0.4),
+            textprops=dict(color="black", fontsize=12)
+        )
+
+        for autotext in autotexts:
+            autotext.set_fontsize(11)
+            autotext.set_weight("bold")
+
+        ax5.set_title('', fontsize=14)
+        st.pyplot(fig5)
+
+    col3, col4, col5 = st.columns(3)
+
+    # 3. Categorías de productos más compradas
+    with col3:
+        st.subheader("Categoría más compradas (Top 10)")
+        top_categories_5 = df_5['product_category_name'].value_counts().head(10)
+        top_categories_5.index = top_categories_5.index.str[:15] + "..."
+        fig2, ax2 = plt.subplots()
+        top_categories_5.plot(kind='bar', ax=ax2, color='lightgreen')
+        ax2.set_ylabel('Cantidad')
+        ax2.set_xlabel('')
+        ax2.set_title('')
+        st.pyplot(fig2)
+
+    # 4. Ingresos por vendedor
+    with col4:
+        st.subheader("Ingresos por vendedor (Top 10)")
+        seller_revenue_5 = df_5.groupby('seller_id')['Total prize'].sum().sort_values(ascending=False).head(10)
+        seller_revenue_5.index = seller_revenue_5.index.str[:10] + "..."
+        fig3, ax3 = plt.subplots()
+        seller_revenue_5.plot(kind='bar', ax=ax3, color='gold')
+        ax3.set_ylabel('Ingresos')
+        ax3.set_xlabel('')
+        ax3.set_title('')
+        st.pyplot(fig3)
+
+    # 5. Costo medio de envío por categoría
+    with col5:
+        st.subheader("Coste medio de envío por categoría (Top 10)")
+        shipping_cost_5 = df_5.groupby('product_category_name')['freight_value'].mean().sort_values(ascending=False).head(10)
+        shipping_cost_5.index = shipping_cost_5.index.str[:15] + "..."
+        fig4, ax4 = plt.subplots()
+        shipping_cost_5.plot(kind='bar', ax=ax4, color='salmon')
+        ax4.set_ylabel('Costo Promedio')
+        ax4.set_xlabel('')
+        ax4.set_title('')
+        st.pyplot(fig4)
 
     st.subheader("Insight")
-    st.info("Las categorías de 'cama, mesa y baño' y 'tecnología' concentran gran parte del volumen. Sin embargo, categorías con menos ventas presentan tickets más altos y márgenes potencialmente mayores.")
+    st.info("Las categorías de 'bed_bath_table', 'health_beauty' y 'sports_leisure' concentran gran parte del volumen.")
 
-    # Carga de datos
-items = pd.read_csv('Olist_Data/olist_order_items_dataset.csv')
-sellers = pd.read_csv('Olist_Data/olist_sellers_dataset.csv')
-products = pd.read_csv('Olist_Data/olist_products_dataset.csv')
-name_trans = pd.read_csv('Olist_Data/product_category_name_translation.csv')
-
-# Limpieza y unión de datos
-reviews_5 = reviews[['order_id', 'review_score']].copy()
-items_5 = items[['order_id', 'product_id', 'seller_id', 'price', 'freight_value']].copy()
-items_5['Total prize'] = items_5['price'].astype(float) + items_5['freight_value'].astype(float)
-items_5['Total prize'] = items_5['Total prize'].round(2)
-
-products_5 = products[['product_id', 'product_category_name']].copy()
-product_category_5 = pd.merge(products_5, name_trans, on='product_category_name', how='left')
-product_category_5 = product_category_5[['product_id', 'product_category_name_english']]
-product_category_5 = product_category_5.rename(columns={'product_category_name_english': 'product_category_name'})
-
-# Unión completa
-df_5 = pd.merge(reviews_5, items_5, on='order_id', how='left')
-df_5 = pd.merge(df_5, sellers, on='seller_id', how='left')
-df_5 = pd.merge(df_5, product_category_5, on='product_id', how='left')
-df_5 = df_5.drop_duplicates()
-
-# Filtros dinámicos en la barra lateral
-st.sidebar.header("🔎 Filtros")
-
-# Filtro por estado del vendedor
-estados_disponibles = df_5['seller_state'].dropna().unique()
-estados_seleccionados = st.sidebar.multiselect(
-    "Filtrar por estado del vendedor",
-    options=sorted(estados_disponibles),
-    default=sorted(estados_disponibles)
-)
-df_5 = df_5[df_5['seller_state'].isin(estados_seleccionados)]
-
-# Filtro por calificación
-score_min, score_max = st.sidebar.slider(
-    "Filtrar por calificación (review_score)",
-    int(df_5['review_score'].min()),
-    int(df_5['review_score'].max()),
-    (int(df_5['review_score'].min()), int(df_5['review_score'].max()))
-)
-df_5 = df_5[(df_5['review_score'] >= score_min) & (df_5['review_score'] <= score_max)]
-
-# Filtro por precio total
-price_min, price_max = st.sidebar.slider(
-    "Filtrar por precio total",
-    float(df_5['Total prize'].min()), float(df_5['Total prize'].max()),
-    (float(df_5['Total prize'].min()), float(df_5['Total prize'].max()))
-)
-df_5 = df_5[(df_5['Total prize'] >= price_min) & (df_5['Total prize'] <= price_max)]
-
-# Filtro por costo de envío
-freight_min, freight_max = st.sidebar.slider(
-    "Filtrar por costo de envío",
-    float(df_5['freight_value'].min()), float(df_5['freight_value'].max()),
-    (float(df_5['freight_value'].min()), float(df_5['freight_value'].max()))
-)
-df = df_5[(df_5['freight_value'] >= freight_min) & (df_5['freight_value'] <= freight_max)]
-
-# Filtro por número de pedidos
-st.sidebar.subheader("Filtrar por número de pedidos")
-# Contamos el número de pedidos por vendedor (o cliente)
-order_count = df.groupby('seller_id')['order_id'].nunique()
-
-# Definir el rango de pedidos (mínimo y máximo)
-min_orders = int(order_count.min())
-max_orders = int(order_count.max())
-
-# Slider para seleccionar el rango de número de pedidos
-min_filter, max_filter = st.sidebar.slider(
-    "Selecciona el rango de número de pedidos",
-    min_value=min_orders,
-    max_value=max_orders,
-    value=(min_orders, max_orders),
-    step=1
-)
-
-# Filtrar el dataframe según el número de pedidos
-filtered_order_df = order_count[(order_count >= min_filter) & (order_count <= max_filter)]
-df_5 = df_5[df_5['seller_id'].isin(filtered_order_df.index)]
-
-# -----------------------------
-# Gráficos
-# -----------------------------
-col1, col2 = st.columns(2)
-
-# 1. Vendedores mejor valorados
-with col1:
-    st.subheader("🌟 Vendedores mejor valorados (Top 10)")
-    top_sellers_5 = df_5.groupby('seller_id')['review_score'].mean().sort_values(ascending=False).head(10)
-    top_sellers_5.index = top_sellers_5.index.str[:10] + "..."
-    fig1, ax1 = plt.subplots()
-    top_sellers_5.plot(kind='bar', ax=ax1, color='skyblue')
-    ax1.set_ylabel('Puntuación Promedio')
-    ax1.set_xlabel('')
-    ax1.set_title('')
-    st.pyplot(fig1)
-
-# 2. Distribución de calificaciones (Donut)
-with col2:
-    st.subheader("⭐ Distribución de Calificaciones")
-    review_counts_5 = df_5['review_score'].value_counts().sort_index()
-    colors_5 = sns.color_palette('pastel')[0:5]
-    labels_5 = [str(int(score)) for score in review_counts_5.index]
-
-    fig5, ax5 = plt.subplots()
-    wedges, texts, autotexts = ax5.pie(
-        review_counts_5,
-        labels=labels_5,
-        autopct='%1.1f%%',
-        startangle=90,
-        colors =colors_5,
-        wedgeprops=dict(width=0.4),
-        textprops=dict(color="black", fontsize=12)
-    )
-
-    for autotext in autotexts:
-        autotext.set_fontsize(11)
-        autotext.set_weight("bold")
-
-    ax5.set_title('', fontsize=14)
-    st.pyplot(fig5)
-
-col3, col4, col5 = st.columns(3)
-
-# 3. Categorías de productos más compradas
-with col3:
-    st.subheader("📈 Categoría más compradas (Top 10)")
-    top_categories_5 = df_5['product_category_name'].value_counts().head(10)
-    top_categories_5.index = top_categories_5.index.str[:15] + "..."
-    fig2, ax2 = plt.subplots()
-    top_categories_5.plot(kind='bar', ax=ax2, color='lightgreen')
-    ax2.set_ylabel('Cantidad')
-    ax2.set_xlabel('')
-    ax2.set_title('')
-    st.pyplot(fig2)
-
-# 4. Ingresos por vendedor
-with col4:
-    st.subheader("💰 Ingresos por vendedor (Top 10)")
-    seller_revenue_5 = df_5.groupby('seller_id')['Total prize'].sum().sort_values(ascending=False).head(10)
-    seller_revenue_5.index = seller_revenue_5.index.str[:10] + "..."
-    fig3, ax3 = plt.subplots()
-    seller_revenue_5.plot(kind='bar', ax=ax3, color='gold')
-    ax3.set_ylabel('Ingresos')
-    ax3.set_xlabel('')
-    ax3.set_title('')
-    st.pyplot(fig3)
-
-# 5. Costo medio de envío por categoría
-with col5:
-    st.subheader("🚚 Coste medio de envío por categoría (Top 10)")
-    shipping_cost_5 = df_5.groupby('product_category_name')['freight_value'].mean().sort_values(ascending=False).head(10)
-    shipping_cost_5.index = shipping_cost_5.index.str[:15] + "..."
-    fig4, ax4 = plt.subplots()
-    shipping_cost_5.plot(kind='bar', ax=ax4, color='salmon')
-    ax4.set_ylabel('Costo Promedio')
-    ax4.set_xlabel('')
-    ax4.set_title('')
-    st.pyplot(fig4)
+   
 
