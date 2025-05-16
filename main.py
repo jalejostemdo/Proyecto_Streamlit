@@ -116,7 +116,7 @@ df_5 = pd.merge(df_5, product_category_5, on='product_id', how='left')
 df_5 = df_5.drop_duplicates()
 
 # ==== SIDEBAR ====
-st.sidebar.title("🎛️ Filtros")
+st.sidebar.title("Filtros")
 
 min_date = df['order_purchase_timestamp'].min()
 max_date = df['order_purchase_timestamp'].max()
@@ -339,8 +339,8 @@ with st.expander("4.1 Distribución Geográfica de Clientes", expanded=True):
         if not nuevos_df.empty:
             mejor_mes = nuevos_df.loc[nuevos_df['nuevos_clientes'].idxmax()]
             st.markdown(f"""
-            ✅ **Mes con más captación:** `{mejor_mes['year_month']}`  
-            👥 **Nuevos clientes:** `{mejor_mes['nuevos_clientes']}`
+            **Mes con más captación:** `{mejor_mes['year_month']}`  
+            **Nuevos clientes:** `{mejor_mes['nuevos_clientes']}`
             """)
         
 
@@ -473,7 +473,7 @@ with st.expander("4.3 Logística y Diagnóstico de Retrasos en Entregas", expand
 
 
     with col2:
-        st.caption("📊 Comparación de Pedidos Tardíos vs Totales por Ciudad")
+        st.caption("Comparación de Pedidos Tardíos vs Totales por Ciudad")
 
         # Crear un DataFrame con los datos necesarios
         stacked_data = late_orders[["late_orders", "total_orders", "late_percentage", "avg_late_days"]].copy()
